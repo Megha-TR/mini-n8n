@@ -196,7 +196,7 @@ export async function triggerWorkflowRun(
     return { success: false, error: 'Workflow has no steps configured' };
   }
 
-  // 5. Create workflow_run record in Postgres
+  // 5. Create workflow_run record in Postgres (initial status: pending)
   const runId = uuidv4();
   await hasuraAdminQuery(INSERT_WORKFLOW_RUN, {
     object: {
@@ -204,13 +204,13 @@ export async function triggerWorkflowRun(
       workflow_id: workflowId,
       triggered_by_user_id: callerUserId,
       trigger_type: triggerType,
-      status: 'running',
+      status: 'pending',
       current_step_index: 0,
       context_data: {},
     },
   });
 
-  // 6. Create step_run records in Postgres
+  // 6. Create step_run records in Postgres (initial status: pending)
   const stepRunObjects = steps.map((s: any) => ({
     id: uuidv4(),
     workflow_run_id: runId,
@@ -227,7 +227,7 @@ export async function triggerWorkflowRun(
   // 7. Start executing steps asynchronously
   executeWorkflowLoop(runId, workflowId, steps, stepRunObjects, 0, {});
 
-  return { success: true, runId, status: 'running' };
+  return { success: true, runId, status: 'pending' };
 }
 
 
@@ -241,6 +241,11 @@ async function executeWorkflowLoop(
   startIndex: number,
   contextData: Record<string, any>
 ) {
+  // Update workflow run status: pending -> running in PostgreSQL via Hasura
+  await hasuraAdminQuery(UPDATE_WORKFLOW_RUN, {
+    id: runId,
+    set: { status: 'running', updated_at: new Date().toISOString() },
+  });
   for (let i = startIndex; i < steps.length; i++) {
     const step = steps[i];
     const stepRun = stepRunRecords[i];
