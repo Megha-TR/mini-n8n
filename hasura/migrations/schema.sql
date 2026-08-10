@@ -134,3 +134,39 @@ CREATE INDEX IF NOT EXISTS idx_workflows_org ON public.workflows(org_id);
 CREATE INDEX IF NOT EXISTS idx_workflow_steps_workflow ON public.workflow_steps(workflow_id, step_order);
 CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON public.workflow_runs(workflow_id);
 CREATE INDEX IF NOT EXISTS idx_step_runs_run ON public.step_runs(workflow_run_id);
+
+-- Initial Seed Data for Instant Out-of-the-Box Demo
+INSERT INTO auth.users (id, email, display_name) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'alice@acme.com', 'Alice (Org A Owner)'),
+  ('22222222-2222-2222-2222-222222222222', 'bob@acme.com', 'Bob (Org A Editor)'),
+  ('33333333-3333-3333-3333-333333333333', 'charlie@acme.com', 'Charlie (Org A Viewer)'),
+  ('44444444-4444-4444-4444-444444444444', 'david@beta.com', 'David (Org B Owner)'),
+  ('55555555-5555-5555-5555-555555555555', 'eva@beta.com', 'Eva (Org B Editor)')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.organizations (id, name, calls_used, max_calls_allowed) VALUES
+  ('aaaaa-11111-org-a', 'Acme AI Corp (Org A)', 12, 50),
+  ('bbbbb-22222-org-b', 'Beta Dynamics (Org B)', 2, 20)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.org_members (id, org_id, user_id, role) VALUES
+  ('mem-1', 'aaaaa-11111-org-a', '11111111-1111-1111-1111-111111111111', 'owner'),
+  ('mem-2', 'aaaaa-11111-org-a', '22222222-2222-2222-2222-222222222222', 'editor'),
+  ('mem-3', 'aaaaa-11111-org-a', '33333333-3333-3333-3333-333333333333', 'viewer'),
+  ('mem-4', 'bbbbb-22222-org-b', '44444444-4444-4444-4444-444444444444', 'owner'),
+  ('mem-5', 'bbbbb-22222-org-b', '55555555-5555-5555-5555-555555555555', 'editor')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.workflows (id, org_id, name, description, is_active, created_by) VALUES
+  ('wf-org-a-multistep-scenario', 'aaaaa-11111-org-a', 'Multi-Step Enterprise AI Pipeline', 'Automated customer ticket classification, API lookup, approval gate, and DB persistence', true, '11111111-1111-1111-1111-111111111111'),
+  ('wf-org-b-marketing', 'bbbbb-22222-org-b', 'Marketing Lead Scraper', 'Extracts and classifies marketing leads for Beta Dynamics', true, '44444444-4444-4444-4444-444444444444')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.workflow_steps (id, workflow_id, step_order, name, type, config) VALUES
+  ('st-1', 'wf-org-a-multistep-scenario', 1, 'LLM Customer Sentiment Analysis', 'llm_call', '{"prompt": "Analyze customer ticket sentiment", "model": "gemini-2.5-flash"}'::jsonb),
+  ('st-2', 'wf-org-a-multistep-scenario', 2, 'HTTP CRM Lead Status Verification', 'http_request', '{"endpoint": "https://httpbin.org/post", "method": "POST"}'::jsonb),
+  ('st-3', 'wf-org-a-multistep-scenario', 3, 'Conditional Branch on Positive Sentiment', 'conditional_branch', '{"condition_field": "step1.sentiment", "expected_value": "positive"}'::jsonb),
+  ('st-4', 'wf-org-a-multistep-scenario', 4, 'Executive Approval Gate', 'approval_gate', '{"message": "High-value lead detected. Requires explicit executive approval.", "required_role": "editor"}'::jsonb),
+  ('st-5', 'wf-org-a-multistep-scenario', 5, 'Write Verified Lead to Production Database', 'db_write', '{"table": "data_records", "fields": ["title", "payload"]}'::jsonb),
+  ('st-6', 'wf-org-a-multistep-scenario', 6, 'Slack / Email Executive Notification', 'notify', '{"channel": "leadership-alerts", "template": "Lead processed successfully"}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
