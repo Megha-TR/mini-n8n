@@ -1,93 +1,121 @@
 # Mini-n8n: Multi-Tenant AI Agent Workflow Builder
 
-A production-ready, purpose-built AI Agent Workflow Builder built with **Next.js 14**, **Hasura GraphQL Engine**, **PostgreSQL 15**, **Docker**, and **Google Gemini API**.
+A purpose-built AI Agent Workflow Builder using **Next.js 14**, **Hasura GraphQL Engine**, **PostgreSQL 15**, and **Google Gemini API**.
 
 ---
 
-## 🌟 Key Architecture & Highlights
+## Architecture
 
-1. **Layer 1 Security (Hasura DB-Level Scoping)**:
-   - Every GraphQL query, mutation, and subscription is evaluated against PostgreSQL permissions defined in Hasura metadata (`hasura/metadata/hasura_metadata.json`).
-   - Enforces multi-tenant isolation via `x-hasura-org-id`, `x-hasura-user-id`, and `x-hasura-role` session headers over the `org_members` table.
-   - Cross-org ID-guessing attacks automatically return zero records or HTTP 403 Forbidden.
+### How Data Flows at Runtime
 
-2. **Layer 2 Security (Action Gatekeepers)**:
-   - Backend Hasura Actions (`/api/actions/trigger` and `/api/actions/approve`) enforce fine-grained role permissions.
-   - Sensitive step types (`db_write`, `notify`) can only be added by Organization Owners.
-   - Non-members and Viewer roles are blocked from triggering workflows or clearing Approval Gates.
+```
+Browser (React)
+  ↓ GraphQL query + x-hasura-user-id / x-hasura-role headers
+/api/graphql (Next.js route)
+  ↓ Proxies to Hasura with admin secret + session headers
+Hasura GraphQL Engine (port 8080)
+  ↓ Evaluates permission rules against org_members table
+PostgreSQL (port 5432)
+```
 
-3. **Multi-Step Execution Engine (`lib/workflowEngine.ts`)**:
-   - Executes 6 distinct step types sequentially:
-     - `llm_call`: Real Gemini AI generation with fallback latency stub.
-     - `http_request`: External API HTTP webhook invocation.
-     - `conditional_branch`: Expression & sentiment branch evaluation.
-     - `approval_gate`: Pauses workflow execution, requiring human role authorization.
-     - `db_write`: Restricted database mutation to `data_records`.
-     - `notify`: Notification dispatcher.
-   - Real-time step state progression streamed via GraphQL Subscriptions / Polling.
+**Every GraphQL query from the frontend is proxied through `/api/graphql` directly to the Hasura GraphQL Engine.** Hasura evaluates its metadata permission rules (defined in `hasura/metadata/hasura_metadata.json`) against the PostgreSQL `org_members` table to enforce row-level access control. There is no in-memory data store — all runtime state lives in PostgreSQL.
+
+### Layer 1: Hasura DB-Level Permissions
+
+Hasura metadata defines `select_permissions` on every table with filters like:
+
+```json
+{
+  "filter": {
+    "organization": {
+      "members": {
+        "user_id": { "_eq": "X-Hasura-User-Id" }
+      }
+    }
+  }
+}
+```
+
+This means a user can only see workflows, runs, and step_runs belonging to organizations they are a member of. This is enforced by Hasura at the database query level, not by application code.
+
+### Layer 2: Action Handler Gatekeepers
+
+Sensitive operations (triggering runs, approving gates) go through Hasura Action handlers (`/api/actions/trigger`, `/api/actions/approve`) which verify org membership and role via Hasura admin queries before executing.
+
+### Workflow Engine
+
+`lib/workflowEngine.ts` orchestrates step execution. Every state change (creating workflow_runs, updating step_runs, incrementing org quota) is performed via GraphQL mutations to Hasura using `lib/hasuraAdmin.ts` — a server-side client that authenticates with the Hasura admin secret.
 
 ---
 
-## 🚀 Quick Start (Local Docker Setup)
+## Quick Start (Local Docker Setup)
 
-Run the full stack (PostgreSQL + Hasura GraphQL Engine + Next.js) with a single command:
+**Prerequisites**: Docker and Docker Compose installed.
 
 ```bash
-# 1. Clone the repository
+# 1. Clone
 git clone https://github.com/Megha-TR/mini-n8n.git
 cd mini-n8n
 
-# 2. Configure Environment Variables
+# 2. Configure
 cp .env.example .env.local
-# (Optional) Set your GEMINI_API_KEY in .env.local
+# Optionally set GEMINI_API_KEY for real LLM responses
 
-# 3. Spin up PostgreSQL + Hasura + Next.js App
+# 3. Start everything
 docker compose up --build
 ```
 
-- **Web Application UI**: [http://localhost:3000](http://localhost:3000)
-- **Hasura Console**: [http://localhost:8080/console](http://localhost:8080/console) (Admin Secret: `myadminsecretkey`)
-- **Hasura GraphQL Endpoint**: `http://localhost:8080/v1/graphql`
+This starts:
+- **PostgreSQL 15** on port 5432 (auto-runs `hasura/migrations/schema.sql` which creates tables and seeds test data)
+- **Hasura GraphQL Engine** on port 8080 (console at `http://localhost:8080/console`, admin secret: `myadminsecretkey`)
+- **Next.js App** on port 3000
+
+### Without Docker (frontend only, requires external Hasura)
+
+```bash
+npm install
+# Set HASURA_GRAPHQL_URL and HASURA_GRAPHQL_ADMIN_SECRET in .env.local
+npm run dev
+```
 
 ---
 
-## 🌐 Deployed Cloud Setup (Vercel + Hasura Cloud / Nhost)
+## Test Users (Seeded in PostgreSQL)
 
-To deploy to production:
+| Organization | User | Role | Can Trigger | Can Approve | Can Add db_write |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Acme AI Corp (Org A) | Alice | Owner | Yes | Yes | Yes |
+| Acme AI Corp (Org A) | Bob | Editor | Yes | Yes | No |
+| Acme AI Corp (Org A) | Charlie | Viewer | No | No | No |
+| Beta Dynamics (Org B) | David | Owner | Yes | Yes | Yes |
+| Beta Dynamics (Org B) | Eva | Editor | Yes | Yes | No |
 
-1. **Provision PostgreSQL Database & Hasura GraphQL Engine**:
-   - Deploy Hasura on [Hasura Cloud](https://cloud.hasura.io) or [Nhost](https://nhost.io).
-   - Apply schema migration from `hasura/migrations/schema.sql`.
-   - Apply Hasura metadata from `hasura/metadata/hasura_metadata.json`.
-
-2. **Deploy Frontend & Action Handlers to Vercel**:
-   - Connect your GitHub repository (`https://github.com/Megha-TR/mini-n8n`) to [Vercel](https://vercel.com).
-   - Configure Environment Variables on Vercel:
-     - `NEXT_PUBLIC_HASURA_GRAPHQL_URL`: `https://<YOUR-HASURA-INSTANCE>.hasura.app/v1/graphql`
-     - `HASURA_GRAPHQL_ADMIN_SECRET`: `<YOUR_HASURA_ADMIN_SECRET>`
-     - `GEMINI_API_KEY`: `<YOUR_GEMINI_API_KEY>`
+Cross-org isolation: David (Org B) cannot see or interact with Org A's workflows. This is enforced by Hasura's permission rules at the database level.
 
 ---
 
-## 🔐 Multi-Tenant Test Users & Contexts
+## Key Files
 
-The application pre-seeds 2 organizations and 5 users for testing permissions out-of-the-box:
-
-| Organization | User | Role | Access Scope |
-| :--- | :--- | :--- | :--- |
-| **Acme AI Corp (Org A)** | Alice | Owner | Full access (Trigger, Create `db_write`, Approve Gates) |
-| **Acme AI Corp (Org A)** | Bob | Editor | Trigger, Approve Gates (Restricted from adding `db_write`) |
-| **Acme AI Corp (Org A)** | Charlie | Viewer | Read-Only (Blocked from triggering or approving) |
-| **Beta Dynamics (Org B)** | David | Owner | Full access to Org B (Isolated from Org A) |
-| **Beta Dynamics (Org B)** | Eva | Editor | Editor access to Org B (Isolated from Org A) |
+| File | Purpose |
+| :--- | :--- |
+| `lib/hasuraAdmin.ts` | Server-side Hasura GraphQL client (admin secret auth) |
+| `lib/hasuraClient.ts` | Browser-side GraphQL client (calls `/api/graphql` proxy) |
+| `app/api/graphql/route.ts` | Pure proxy to Hasura Engine — no in-memory fallback |
+| `lib/workflowEngine.ts` | Step execution engine — all DB ops via Hasura mutations |
+| `lib/authContext.ts` | Org membership verification via Hasura queries |
+| `lib/stepExecutors/dbWrite.ts` | Inserts `data_records` via Hasura mutation |
+| `lib/db.ts` | Type definitions and seed constants only (no runtime store) |
+| `hasura/migrations/schema.sql` | PostgreSQL schema + seed data |
+| `hasura/metadata/hasura_metadata.json` | Hasura permission rules, relationships, actions |
+| `docker-compose.yml` | PostgreSQL + Hasura + Next.js orchestration |
 
 ---
 
-## 🧪 Security & Verification Test Matrix
+## Step Types
 
-Open the **Security & ID-Guessing Matrix** tab in the UI to run the 5 automated attack vector tests:
-1. **Cross-Org GraphQL ID-Guessing Isolation**: Org B user queries Org A Workflow ID directly via GraphQL.
-2. **Direct Action Trigger Attack Resistance**: Org B user posts to `/api/actions/trigger` with Org A Workflow ID.
-3. **Direct Action Approval Gate Attack Resistance**: Org B user posts to `/api/actions/approve` with Org A Step Run ID.
-4. **Viewer Role Trigger Enforcement**: Org A Viewer role attempts to trigger workflow run.
-5. **Layer 2 Step Gating Enforcement**: Org A Editor attempts to insert `db_write` step.
+1. **llm_call** — Calls Gemini API (or runs with disclosed 800ms stub if no API key)
+2. **http_request** — Makes external HTTP requests with retry logic
+3. **conditional_branch** — Evaluates expressions against prior step outputs
+4. **approval_gate** — Pauses execution until an Owner/Editor approves
+5. **db_write** — Inserts a `data_records` row via Hasura mutation (Owner-only creation)
+6. **notify** — Dispatches notification events
