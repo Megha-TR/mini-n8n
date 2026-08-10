@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Workflow, OrgMember, User, WorkflowRun, StepRun } from '@/lib/db';
+import { Workflow, OrgMember, User, WorkflowRun, StepRun } from '@/lib/types';
 import {
   Play,
   CheckCircle2,

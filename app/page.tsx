@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { SEED_USERS, SEED_ORGS, SEED_MEMBERS, User, Organization, OrgMember, Workflow, WorkflowStep, WorkflowTrigger, WorkflowRun, StepRun } from '@/lib/db';
+import { User, Organization, OrgMember, Workflow, WorkflowStep, WorkflowTrigger, WorkflowRun, StepRun } from '@/lib/types';
+import { DEMO_USERS as SEED_USERS, DEMO_ORGS as SEED_ORGS, DEMO_MEMBERS as SEED_MEMBERS } from '@/lib/demoUsers';
 import { Navbar } from '@/components/Navbar';
 import { WorkflowBuilder } from '@/components/WorkflowBuilder';
 import { ExecutionDashboard } from '@/components/ExecutionDashboard';

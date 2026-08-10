@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { SEED_USERS, SEED_ORGS, SEED_MEMBERS, User, Organization, OrgMember } from '@/lib/db';
+import { User, Organization, OrgMember } from '@/lib/types';
+import { DEMO_USERS as SEED_USERS, DEMO_ORGS as SEED_ORGS, DEMO_MEMBERS as SEED_MEMBERS } from '@/lib/demoUsers';
 import { Building2, UserCheck, AlertTriangle } from 'lucide-react';
 
 interface NavbarProps {

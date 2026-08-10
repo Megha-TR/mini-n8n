@@ -1,4 +1,4 @@
-import { WorkflowStep } from '../db';
+import { WorkflowStep } from '../types';
 
 export function executeConditionalBranchStep(
   step: WorkflowStep,

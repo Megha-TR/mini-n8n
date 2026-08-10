@@ -1,4 +1,4 @@
-import { WorkflowStep, StepRun } from '../db';
+import { WorkflowStep, StepRun } from '../types';
 
 export async function executeLlmCallStep(
   step: WorkflowStep,

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Workflow, WorkflowStep, WorkflowTrigger, OrgMember } from '@/lib/db';
+import { Workflow, WorkflowStep, WorkflowTrigger, OrgMember } from '@/lib/types';
 import {
   Sparkles,
   Globe,

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Organization, OrgMember } from '@/lib/db';
+import { User, Organization, OrgMember } from '@/lib/types';
 import { ShieldCheck, Lock, CheckCircle2, XCircle, Play, UserCheck, ShieldAlert, AlertTriangle } from 'lucide-react';
 
 interface SecurityTesterProps {
@@ -68,10 +68,10 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
             'Content-Type': 'application/json',
             'x-hasura-user-id': '44444444-4444-4444-4444-444444444444',
             'x-hasura-role': 'owner',
-            'x-hasura-org-id': 'bbbbb-22222-org-b',
+            'x-hasura-org-id': 'b0000000-0000-0000-0000-000000000002',
           },
           body: JSON.stringify({
-            query: `query GetOrgAWorkflow { workflows(where: { id: { _eq: "wf-org-a-multistep-scenario" } }) { id name org_id } }`,
+            query: `query GetOrgAWorkflow { workflows(where: { id: { _eq: "c0000000-0000-0000-0000-000000000001" } }) { id name org_id } }`,
           }),
         });
         const json = await res.json();
@@ -111,9 +111,9 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
             'Content-Type': 'application/json',
             'x-hasura-user-id': '44444444-4444-4444-4444-444444444444',
             'x-hasura-role': 'owner',
-            'x-hasura-org-id': 'bbbbb-22222-org-b',
+            'x-hasura-org-id': 'b0000000-0000-0000-0000-000000000002',
           },
-          body: JSON.stringify({ input: { workflow_id: 'wf-org-a-multistep-scenario' } }),
+          body: JSON.stringify({ input: { workflow_id: 'c0000000-0000-0000-0000-000000000001' } }),
         });
         const json = await res.json();
 
@@ -151,7 +151,7 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
             'Content-Type': 'application/json',
             'x-hasura-user-id': '44444444-4444-4444-4444-444444444444',
             'x-hasura-role': 'owner',
-            'x-hasura-org-id': 'bbbbb-22222-org-b',
+            'x-hasura-org-id': 'b0000000-0000-0000-0000-000000000002',
           },
           body: JSON.stringify({ input: { step_run_id: 'fake-step-run-id-org-a' } }),
         });
@@ -178,10 +178,10 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
             'Content-Type': 'application/json',
             'x-hasura-user-id': '33333333-3333-3333-3333-333333333333',
             'x-hasura-role': 'viewer',
-            'x-hasura-org-id': 'aaaaa-11111-org-a',
+            'x-hasura-org-id': 'a0000000-0000-0000-0000-000000000001',
           },
           body: JSON.stringify({
-            query: `mutation TriggerRun { triggerWorkflowRun(workflow_id: "wf-org-a-multistep-scenario") { run_id status } }`,
+            query: `mutation TriggerRun { triggerWorkflowRun(workflow_id: "c0000000-0000-0000-0000-000000000001") { run_id status } }`,
           }),
         });
         const json = await res.json();
@@ -207,10 +207,10 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
             'Content-Type': 'application/json',
             'x-hasura-user-id': '22222222-2222-2222-2222-222222222222',
             'x-hasura-role': 'editor',
-            'x-hasura-org-id': 'aaaaa-11111-org-a',
+            'x-hasura-org-id': 'a0000000-0000-0000-0000-000000000001',
           },
           body: JSON.stringify({
-            query: `mutation AddSensitiveStep { insert_workflow_steps_one(object: { workflow_id: "wf-org-a-multistep-scenario", name: "Malicious DB Write", type: "db_write" }) { id } }`,
+            query: `mutation AddSensitiveStep { insert_workflow_steps_one(object: { workflow_id: "c0000000-0000-0000-0000-000000000001", name: "Malicious DB Write", type: "db_write" }) { id } }`,
             variables: { type: 'db_write' },
           }),
         });
