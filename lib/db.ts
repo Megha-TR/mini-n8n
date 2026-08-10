@@ -105,11 +105,6 @@ export interface DataRecord {
 }
 
 // --- Seed Constants ---
-// These mirror the seed data inserted into PostgreSQL by schema.sql.
-// They are used by the frontend user/org context switcher component
-// (the dropdown in the Navbar) so the UI can list available test
-// identities without querying the database.
-
 export const SEED_USERS: User[] = [
   { id: '11111111-1111-1111-1111-111111111111', email: 'alice@acme.com', display_name: 'Alice (Org A Owner)' },
   { id: '22222222-2222-2222-2222-222222222222', email: 'bob@acme.com', display_name: 'Bob (Org A Editor)' },
@@ -120,7 +115,7 @@ export const SEED_USERS: User[] = [
 
 export const SEED_ORGS: Organization[] = [
   {
-    id: 'aaaaa-11111-org-a',
+    id: 'a0000000-0000-0000-0000-000000000001',
     name: 'Acme AI Corp (Org A)',
     calls_used: 12,
     max_calls_allowed: 50,
@@ -128,7 +123,7 @@ export const SEED_ORGS: Organization[] = [
     updated_at: new Date().toISOString(),
   },
   {
-    id: 'bbbbb-22222-org-b',
+    id: 'b0000000-0000-0000-0000-000000000002',
     name: 'Beta Dynamics (Org B)',
     calls_used: 2,
     max_calls_allowed: 20,
@@ -138,9 +133,9 @@ export const SEED_ORGS: Organization[] = [
 ];
 
 export const SEED_MEMBERS: OrgMember[] = [
-  { id: 'm1', org_id: 'aaaaa-11111-org-a', user_id: '11111111-1111-1111-1111-111111111111', role: 'owner', created_at: new Date().toISOString() },
-  { id: 'm2', org_id: 'aaaaa-11111-org-a', user_id: '22222222-2222-2222-2222-222222222222', role: 'editor', created_at: new Date().toISOString() },
-  { id: 'm3', org_id: 'aaaaa-11111-org-a', user_id: '33333333-3333-3333-3333-333333333333', role: 'viewer', created_at: new Date().toISOString() },
-  { id: 'm4', org_id: 'bbbbb-22222-org-b', user_id: '44444444-4444-4444-4444-444444444444', role: 'owner', created_at: new Date().toISOString() },
-  { id: 'm5', org_id: 'bbbbb-22222-org-b', user_id: '55555555-5555-5555-5555-555555555555', role: 'editor', created_at: new Date().toISOString() },
+  { id: 'f0000000-0000-0000-0000-000000000001', org_id: 'a0000000-0000-0000-0000-000000000001', user_id: '11111111-1111-1111-1111-111111111111', role: 'owner', created_at: new Date().toISOString() },
+  { id: 'f0000000-0000-0000-0000-000000000002', org_id: 'a0000000-0000-0000-0000-000000000001', user_id: '22222222-2222-2222-2222-222222222222', role: 'editor', created_at: new Date().toISOString() },
+  { id: 'f0000000-0000-0000-0000-000000000003', org_id: 'a0000000-0000-0000-0000-000000000001', user_id: '33333333-3333-3333-3333-333333333333', role: 'viewer', created_at: new Date().toISOString() },
+  { id: 'f0000000-0000-0000-0000-000000000004', org_id: 'b0000000-0000-0000-0000-000000000002', user_id: '44444444-4444-4444-4444-444444444444', role: 'owner', created_at: new Date().toISOString() },
+  { id: 'f0000000-0000-0000-0000-000000000005', org_id: 'b0000000-0000-0000-0000-000000000002', user_id: '55555555-5555-5555-5555-555555555555', role: 'editor', created_at: new Date().toISOString() },
 ];

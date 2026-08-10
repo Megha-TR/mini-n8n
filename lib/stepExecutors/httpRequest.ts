@@ -4,7 +4,7 @@ export async function executeHttpRequestStep(
   step: WorkflowStep,
   contextData: Record<string, any>
 ): Promise<{ success: boolean; output?: any; error?: string }> {
-  const url = step.config.url || 'https://api.github.com/zen';
+  const url = step.config.url || step.config.endpoint || 'https://httpbin.org/post';
   const method = (step.config.method || 'GET').toUpperCase();
   const headers = step.config.headers || { 'User-Agent': 'VocalLabs-AgentFlow' };
 
