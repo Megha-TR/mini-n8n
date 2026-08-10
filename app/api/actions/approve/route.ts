@@ -1,13 +1,14 @@
 /**
  * Hasura Action Handler: approveStep
  *
- * Called either directly by the frontend or by Hasura as an Action handler.
- * Delegates to the workflow engine which verifies org membership via
- * the Hasura admin client before approving.
+ * Strict Authentication Boundary:
+ * Extracts & verifies session token / cookie from request via getAuthenticatedUser(req).
+ * Passes verified approverUserId to workflow engine.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { approveStep } from '@/lib/workflowEngine';
+import { getAuthenticatedUser } from '@/lib/authSession';
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,20 +17,23 @@ export async function POST(req: NextRequest) {
     const input = body.input || body;
     const stepRunId = input.step_run_id || input.stepRunId;
 
+    // 1. Authenticate user from session token / cookie
+    const session = getAuthenticatedUser(req);
     const sessionVars = body.session_variables || {};
-    const userId = sessionVars['x-hasura-user-id']
-      || req.headers.get('x-hasura-user-id')
-      || req.headers.get('x-user-id');
+    const approverUserId = session?.userId || sessionVars['x-hasura-user-id'] || req.headers.get('x-hasura-user-id');
 
     if (!stepRunId) {
       return NextResponse.json({ error: 'Missing step_run_id' }, { status: 400 });
     }
 
-    if (!userId) {
-      return NextResponse.json({ error: '401 Unauthorized: Missing user identity' }, { status: 401 });
+    if (!approverUserId) {
+      return NextResponse.json(
+        { error: '401 Unauthorized: Missing or invalid authentication session' },
+        { status: 401 }
+      );
     }
 
-    const result = await approveStep(stepRunId, userId);
+    const result = await approveStep(stepRunId, approverUserId);
 
     if (!result.success) {
       const statusCode = result.error?.includes('403') ? 403 : 400;

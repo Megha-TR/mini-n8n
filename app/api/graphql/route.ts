@@ -1,15 +1,16 @@
 /**
  * Authenticated GraphQL Proxy Route: /api/graphql
  *
- * Security Architecture:
- * 1. Extract user identity (x-hasura-user-id / x-user-id) from client request headers.
- * 2. Authenticate user against PostgreSQL by checking org_members table via Hasura admin query.
- * 3. Resolve user's REAL organization membership and role directly from PostgreSQL.
- * 4. NEVER trust arbitrary x-hasura-role client headers. Role is strictly DB-verified.
- * 5. Forward request to Hasura Engine with verified x-hasura-user-id, x-hasura-role, and x-hasura-org-id.
+ * Strict Authentication Boundary:
+ * 1. Extracts & cryptographically verifies session token / cookie using getAuthenticatedUser(req).
+ * 2. REJECTS any request lacking a valid signed session token (401 Unauthorized).
+ * 3. Takes callerUserId strictly from the verified session payload (NOT from raw client headers).
+ * 4. Resolves user's REAL organization membership and role directly from PostgreSQL (org_members).
+ * 5. Passes verified session variables (x-hasura-user-id, x-hasura-role, x-hasura-org-id) to Hasura.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getAuthenticatedUser } from '@/lib/authSession';
 
 const HASURA_ENDPOINT = process.env.HASURA_GRAPHQL_URL
   || process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL
@@ -39,18 +40,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 1. Extract identity header from client
-  const userId = req.headers.get('x-hasura-user-id') || req.headers.get('x-user-id');
-  const requestedOrgId = req.headers.get('x-hasura-org-id') || req.headers.get('x-org-id');
-
-  if (!userId) {
+  // 1. Enforce Authentication Boundary: Extract & verify session token / cookie
+  const session = getAuthenticatedUser(req);
+  if (!session) {
     return NextResponse.json(
-      { errors: [{ message: '401 Unauthorized: Missing user identity header (x-hasura-user-id).' }] },
+      { errors: [{ message: '401 Unauthorized: Valid authentication session token or cookie required. Please authenticate via /api/auth/login.' }] },
       { status: 401 }
     );
   }
 
-  // 2. Query PostgreSQL via Hasura Admin Secret to authenticate user & resolve real role
+  // callerUserId is derived STRICTLY from cryptographically verified session token!
+  const callerUserId = session.userId;
+  const requestedOrgId = req.headers.get('x-hasura-org-id') || req.headers.get('x-org-id');
+
+  // 2. Query PostgreSQL via Hasura Admin Secret to resolve user's org membership & real role
   let authRes: Response;
   try {
     authRes = await fetch(HASURA_ENDPOINT, {
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         query: AUTH_LOOKUP_QUERY,
-        variables: { user_id: userId },
+        variables: { user_id: callerUserId },
       }),
     });
   } catch (err: any) {
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
 
   if (memberships.length === 0) {
     return NextResponse.json(
-      { errors: [{ message: `401 Unauthorized: User identity "${userId}" has no valid organization membership in database.` }] },
+      { errors: [{ message: `401 Unauthorized: Authenticated user "${callerUserId}" has no valid organization membership in database.` }] },
       { status: 401 }
     );
   }
@@ -87,7 +90,7 @@ export async function POST(req: NextRequest) {
     const match = memberships.find((m) => m.org_id === requestedOrgId);
     if (!match) {
       return NextResponse.json(
-        { errors: [{ message: `403 Forbidden: Cross-Tenant Access Denied. User does not belong to organization "${requestedOrgId}".` }] },
+        { errors: [{ message: `403 Forbidden: Cross-Tenant Access Denied. Authenticated user does not belong to organization "${requestedOrgId}".` }] },
         { status: 403 }
       );
     }
@@ -97,13 +100,13 @@ export async function POST(req: NextRequest) {
   const verifiedRole = activeMember.role;
   const verifiedOrgId = activeMember.org_id;
 
-  // 4. Build trusted Hasura session headers with DB-verified role and org_id
+  // 4. Build trusted Hasura session headers with verified user, role, and org_id
   const hasuraHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-hasura-admin-secret': HASURA_ADMIN_SECRET,
-    'x-hasura-user-id': userId,
-    'x-hasura-role': verifiedRole, // Enforced REAL role from PostgreSQL
-    'x-hasura-org-id': verifiedOrgId, // Enforced REAL org from PostgreSQL
+    'x-hasura-user-id': callerUserId, // Verified from session token
+    'x-hasura-role': verifiedRole,     // Verified from PostgreSQL
+    'x-hasura-org-id': verifiedOrgId,   // Verified from PostgreSQL
   };
 
   // 5. Proxy request to Hasura Engine

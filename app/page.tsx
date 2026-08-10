@@ -31,14 +31,33 @@ export default function Home() {
   const activeRunIdRef = useRef<string | null>(null);
   activeRunIdRef.current = activeRun?.id || null;
 
-  // Reset active run state whenever user context changes
-  const handleUserSelect = (newUserId: string) => {
+  // Reset active run state & authenticate whenever user context changes
+  const handleUserSelect = async (newUserId: string) => {
     activeRunIdRef.current = null;
     setActiveRun(null);
     setStepRuns([]);
     setSelectedWorkflow(null);
     setCurrentUserId(newUserId);
+
+    try {
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: newUserId }),
+      });
+    } catch (err) {
+      console.error('Auth login failed:', err);
+    }
   };
+
+  // Authenticate initial user on mount
+  useEffect(() => {
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUserId }),
+    }).catch(console.error);
+  }, []);
 
   // Load Data for Active User/Org Context
   const loadData = async (targetRunId?: string) => {
