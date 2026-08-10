@@ -1,9 +1,9 @@
 /**
  * Hasura Action Handler: triggerWorkflowRun
  *
- * Strict Authentication Boundary:
- * Extracts & verifies session token / cookie from request via getAuthenticatedUser(req).
- * Passes verified callerUserId to workflow engine.
+ * Authentication & Authorization Boundary:
+ * Extracts user identity from Hasura session_variables / headers / session cookie.
+ * Verifies caller membership and role in target workflow organization BEFORE creating run.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,12 +17,12 @@ export async function POST(req: NextRequest) {
     const input = body.input || body;
     const workflowId = input.workflow_id || input.workflowId;
 
-    // 1. Authenticate user from session token / cookie
+    // Extract user ID: prioritize explicit Hasura session_variables or x-hasura-user-id header
+    const sessionVars = body.session_variables || {};
+    const headerUserId = req.headers.get('x-hasura-user-id');
     const session = getAuthenticatedUser(req);
     
-    // Fallback for Hasura Action event triggers passing session_variables
-    const sessionVars = body.session_variables || {};
-    const callerUserId = session?.userId || sessionVars['x-hasura-user-id'] || req.headers.get('x-hasura-user-id');
+    const callerUserId = sessionVars['x-hasura-user-id'] || headerUserId || session?.userId;
 
     if (!workflowId) {
       return NextResponse.json({ error: 'Missing workflow_id' }, { status: 400 });
@@ -35,11 +35,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Call workflow engine (performs org membership & role authorization before DB write)
     const result = await triggerWorkflowRun(workflowId, callerUserId, 'manual');
 
     if (!result.success) {
       const statusCode = result.error?.includes('429') ? 429
-        : result.error?.includes('403') ? 403
+        : result.error?.includes('403') || result.error?.includes('Forbidden') || result.error?.includes('Permission Denied') ? 403
         : 400;
       return NextResponse.json(
         { message: result.error, error: result.error },

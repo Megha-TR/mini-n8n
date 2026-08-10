@@ -1,9 +1,9 @@
 /**
  * Hasura Action Handler: approveStep
  *
- * Strict Authentication Boundary:
- * Extracts & verifies session token / cookie from request via getAuthenticatedUser(req).
- * Passes verified approverUserId to workflow engine.
+ * Authentication & Authorization Boundary:
+ * Extracts approver identity from Hasura session_variables / headers / session cookie.
+ * Verifies approver membership in target workflow organization BEFORE modifying step state.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,10 +17,12 @@ export async function POST(req: NextRequest) {
     const input = body.input || body;
     const stepRunId = input.step_run_id || input.stepRunId;
 
-    // 1. Authenticate user from session token / cookie
-    const session = getAuthenticatedUser(req);
+    // Extract user ID: prioritize explicit Hasura session_variables or x-hasura-user-id header
     const sessionVars = body.session_variables || {};
-    const approverUserId = session?.userId || sessionVars['x-hasura-user-id'] || req.headers.get('x-hasura-user-id');
+    const headerUserId = req.headers.get('x-hasura-user-id');
+    const session = getAuthenticatedUser(req);
+    
+    const approverUserId = sessionVars['x-hasura-user-id'] || headerUserId || session?.userId;
 
     if (!stepRunId) {
       return NextResponse.json({ error: 'Missing step_run_id' }, { status: 400 });
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest) {
     const result = await approveStep(stepRunId, approverUserId);
 
     if (!result.success) {
-      const statusCode = result.error?.includes('403') ? 403 : 400;
+      const statusCode = result.error?.includes('403') || result.error?.includes('Forbidden') ? 403 : 400;
       return NextResponse.json(
         { message: result.error, error: result.error },
         { status: statusCode }
