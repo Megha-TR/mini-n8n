@@ -1,3 +1,11 @@
+/**
+ * Hasura Action Handler: approveStep
+ *
+ * Called either directly by the frontend or by Hasura as an Action handler.
+ * Delegates to the workflow engine which verifies org membership via
+ * the Hasura admin client before approving.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { approveStep } from '@/lib/workflowEngine';
 
@@ -9,7 +17,9 @@ export async function POST(req: NextRequest) {
     const stepRunId = input.step_run_id || input.stepRunId;
 
     const sessionVars = body.session_variables || {};
-    const userId = sessionVars['x-hasura-user-id'] || req.headers.get('x-hasura-user-id') || req.headers.get('x-user-id');
+    const userId = sessionVars['x-hasura-user-id']
+      || req.headers.get('x-hasura-user-id')
+      || req.headers.get('x-user-id');
 
     if (!stepRunId) {
       return NextResponse.json({ error: 'Missing step_run_id' }, { status: 400 });
@@ -23,7 +33,10 @@ export async function POST(req: NextRequest) {
 
     if (!result.success) {
       const statusCode = result.error?.includes('403') ? 403 : 400;
-      return NextResponse.json({ message: result.error, error: result.error }, { status: statusCode });
+      return NextResponse.json(
+        { message: result.error, error: result.error },
+        { status: statusCode }
+      );
     }
 
     return NextResponse.json({
@@ -31,6 +44,9 @@ export async function POST(req: NextRequest) {
       message: result.message,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Action handler error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || 'Action handler error' },
+      { status: 500 }
+    );
   }
 }

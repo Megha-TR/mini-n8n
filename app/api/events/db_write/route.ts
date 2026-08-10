@@ -1,24 +1,51 @@
+/**
+ * Hasura Event Trigger Handler: db_write
+ *
+ * Receives Hasura event trigger payloads when rows are inserted/updated
+ * in watched tables. Looks up matching db_event workflows via Hasura.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { hasuraAdminQuery } from '@/lib/hasuraAdmin';
 import { triggerWorkflowRun } from '@/lib/workflowEngine';
 
-// Hasura Event Trigger handler on table inserts/updates (e.g. data_records)
 export async function POST(req: NextRequest) {
   try {
     const eventBody = await req.json().catch(() => ({}));
     const eventData = eventBody.event?.data?.new || eventBody;
-    const orgId = eventData.org_id || db.orgs[0]?.id;
+    const orgId = eventData.org_id;
 
-    // Find workflows listening for db_event trigger in this organization
-    const dbEventTriggers = db.triggers.filter((t) => t.trigger_type === 'db_event');
-    const matchedWorkflows = db.workflows.filter(
-      (w) => w.org_id === orgId && dbEventTriggers.some((t) => t.workflow_id === w.id)
+    if (!orgId) {
+      return NextResponse.json({ error: 'No org_id in event payload' }, { status: 400 });
+    }
+
+    // Find workflows with db_event triggers in this org
+    const data = await hasuraAdminQuery<any>(
+      `query GetDbEventWorkflows($org_id: uuid!) {
+        workflows(where: { org_id: { _eq: $org_id }, triggers: { trigger_type: { _eq: "db_event" } } }) {
+          id
+          org_id
+          created_by
+        }
+      }`,
+      { org_id: orgId }
     );
 
+    const matchedWorkflows = data.workflows || [];
     const triggeredRuns = [];
+
     for (const wf of matchedWorkflows) {
-      const owner = db.members.find((m) => m.org_id === wf.org_id && m.role === 'owner');
-      const res = await triggerWorkflowRun(wf.id, owner?.user_id || wf.created_by, 'db_event');
+      // Find org owner
+      const memberData = await hasuraAdminQuery<any>(
+        `query GetOrgOwner($org_id: uuid!) {
+          org_members(where: { org_id: { _eq: $org_id }, role: { _eq: "owner" } }, limit: 1) {
+            user_id
+          }
+        }`,
+        { org_id: wf.org_id }
+      );
+      const ownerUserId = memberData.org_members?.[0]?.user_id || wf.created_by;
+      const res = await triggerWorkflowRun(wf.id, ownerUserId, 'db_event');
       triggeredRuns.push({ workflow_id: wf.id, run_id: res.runId, status: res.status });
     }
 
