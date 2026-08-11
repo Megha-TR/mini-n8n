@@ -1,20 +1,22 @@
 # Mini-n8n: Enterprise Multi-Tenant AI Agent Workflow Builder
 
-A production-grade, secure, multi-tenant AI Agent Workflow Builder built with **Next.js 14 (App Router)**, **Hasura GraphQL Engine v2**, **PostgreSQL 15**, and **Google Gemini API**.
+A production-grade, secure, multi-tenant AI Agent Workflow Builder built with **Nhost Auth**, **Hasura GraphQL Engine v2**, **PostgreSQL 15**, **Next.js 14 (App Router)**, and **Google Gemini API**.
 
 ---
 
 ## 📋 Table of Contents
 
 - [System Architecture & 2-Layer Security](#-system-architecture--2-layer-security)
+- [Nhost Auth & Session Management](#-nhost-auth--session-management)
 - [Quick Start with Docker](#-quick-start-with-docker)
 - [🔍 How to Review & Verify Everything Step-by-Step](#-how-to-review--verify-everything-step-by-step)
   - [1. Verify Docker Stack](#1-verify-docker-stack)
   - [2. Verify PostgreSQL Database](#2-verify-postgresql-database)
   - [3. Verify Hasura GraphQL Engine](#3-verify-hasura-graphql-engine)
   - [4. Verify Real Google Gemini LLM API](#4-verify-real-google-gemini-llm-api)
-  - [5. Verify Web Application & Live Approval Gate](#5-verify-web-application--live-approval-gate)
-  - [6. Run 30/30 Automated E2E Security Test Suite](#6-run-3030-automated-e2e-security-test-suite)
+  - [5. Verify Nhost Auth Session & JWT Claims](#5-verify-nhost-auth-session--jwt-claims)
+  - [6. Verify Web Application & Live Approval Gate](#6-verify-web-application--live-approval-gate)
+  - [7. Run 30/30 Automated E2E Security Test Suite](#7-run-3030-automated-e2e-security-test-suite)
 - [👥 Seeded Test Users & Roles](#-seeded-test-users--roles)
 - [⚡ Workflow Step Engine & Gemini API](#-workflow-step-engine--gemini-api)
 - [🚀 Vercel Deployment & Production Setup](#-vercel-deployment--production-setup)
@@ -28,7 +30,7 @@ This system enforces multi-tenant isolation and role-based access control across
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           Client Browser                                │
-│           (Authenticated via HTTP-Only Session Cookie)                 │
+│          (Authenticated via Nhost Auth JWT Session Cookie)              │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
                                      ▼
@@ -38,7 +40,7 @@ This system enforces multi-tenant isolation and role-based access control across
 │  • /api/actions/trigger (Hasura Action: Session identity & role check)  │
 │  • /api/actions/approve (Hasura Action: Session identity & role check)  │
 └────────────────────────────────────┬────────────────────────────────────┘
-                                     │ Passes Verified Session Headers
+                                     │ Passes Verified Hasura Claims
                                      │ (x-hasura-user-id, role, org-id)
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -69,11 +71,32 @@ This system enforces multi-tenant isolation and role-based access control across
 
 ### Layer 2: Server-Side Action Handlers (State Mutation & Approval Gating)
 - Sensitive operations (**Trigger Workflow Run** and **Approve Step**) route through server-side Action Handlers (`/api/actions/trigger` and `/api/actions/approve`).
-- **Identity Enforcement**: Caller identity (`callerUserId` / `approverUserId`) is derived from session context and validated against org membership in Postgres before modifying state.
+- **Identity Enforcement**: Caller identity (`callerUserId` / `approverUserId`) is derived **STRICTLY** from cryptographically verified Nhost Auth session JWT claims and validated against org membership in Postgres before modifying state.
 - **Role Enforcement**:
   - `triggerWorkflowRun()` requires `owner` or `editor` role (`viewer` returns HTTP `403 Permission Denied`).
   - `approveStep()` requires `owner` or `editor` role in the workflow's org.
 - **Approval Gate Pause/Resume**: Execution automatically halts when an `approval_gate` step is reached. State transitions to `paused` until an authorized user invokes `approveStep()`.
+
+---
+
+## 🔑 Nhost Auth & Session Management
+
+Authentication is powered by **Nhost Auth** using `@nhost/nhost-js` and `@nhost/react`:
+- **Client-Side**: The React component tree is wrapped with `<NhostProvider nhost={nhost}>` in `app/layout.tsx`.
+- **JWT Hasura Claims**: Authenticated sessions issue standard Nhost JWT payloads containing Hasura namespace claims (`https://hasura.io/jwt/claims`):
+  ```json
+  {
+    "sub": "11111111-1111-1111-1111-111111111111",
+    "userId": "11111111-1111-1111-1111-111111111111",
+    "email": "alice@acme.com",
+    "https://hasura.io/jwt/claims": {
+      "x-hasura-default-role": "owner",
+      "x-hasura-allowed-roles": ["owner", "editor", "viewer", "user"],
+      "x-hasura-user-id": "11111111-1111-1111-1111-111111111111",
+      "x-hasura-org-id": "a0000000-0000-0000-0000-000000000001"
+    }
+  }
+  ```
 
 ---
 
@@ -113,7 +136,7 @@ docker exec -it agentflow_postgres psql -U postgres -d postgres -c "\dt public.*
 ```
 **Expected Output**: Shows 8 tables: `organizations`, `org_members`, `workflows`, `workflow_steps`, `workflow_triggers`, `workflow_runs`, `step_runs`, and `data_records`.
 
-Check seeded organizations and workflow steps:
+Check seeded organizations:
 ```bash
 docker exec -it agentflow_postgres psql -U postgres -d postgres -c "SELECT id, name, max_calls_allowed, calls_used FROM public.organizations;"
 ```
@@ -121,16 +144,15 @@ docker exec -it agentflow_postgres psql -U postgres -d postgres -c "SELECT id, n
 ---
 
 ### 3. Verify Hasura GraphQL Engine
-Open Hasura Console or run a GraphQL query against port `8080`:
+Query Hasura schema directly via `curl`:
 
 ```bash
-# Query Hasura schema via curl with Hasura Admin Secret
 curl -s -X POST http://localhost:8080/v1/graphql \
   -H "x-hasura-admin-secret: myadminsecretkey" \
   -H "Content-Type: application/json" \
   -d '{"query": "query { workflows { id name org_id } }"}'
 ```
-**Expected Output**: Returns JSON list of workflows for Org A (*Customer Support Automation*) and Org B (*Marketing Lead Scraper*).
+**Expected Output**: Returns JSON list of workflows for Org A (*Multi-Step Enterprise AI Pipeline*) and Org B (*Marketing Lead Scraper*).
 
 ---
 
@@ -138,15 +160,14 @@ curl -s -X POST http://localhost:8080/v1/graphql \
 The project is configured with a live Google Gemini API key (`gemini-2.5-flash`). You can test it directly:
 
 ```bash
-# Inspect Step 1 (llm_call) output from a workflow run in Postgres
 docker exec agentflow_postgres psql -U postgres -d postgres -c \
   "SELECT step_name, status, output FROM public.step_runs WHERE step_type='llm_call' AND status='completed' LIMIT 1;"
 ```
 **Expected Output**:
 ```json
 {
-  "text": "The customer ticket sentiment is negative based on the analysis.",
-  "sentiment": "negative",
+  "text": "The customer ticket sentiment is positive based on the analysis.",
+  "sentiment": "positive",
   "model": "gemini-2.5-flash",
   "provider": "Real Gemini LLM API"
 }
@@ -154,7 +175,19 @@ docker exec agentflow_postgres psql -U postgres -d postgres -c \
 
 ---
 
-### 5. Verify Web Application & Live Approval Gate
+### 5. Verify Nhost Auth Session & JWT Claims
+Authenticate via Nhost Auth API endpoint to verify token generation:
+
+```bash
+curl -s -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"11111111-1111-1111-1111-111111111111","email":"alice@acme.com"}' | python3 -m json.tool
+```
+**Expected Output**: Returns an Nhost Auth session containing `accessToken`, `user`, `role: owner`, and HTTP-Only session cookies.
+
+---
+
+### 6. Verify Web Application & Live Approval Gate
 
 Open **[http://localhost:3000](http://localhost:3000)** in your web browser.
 
@@ -178,7 +211,7 @@ Open **[http://localhost:3000](http://localhost:3000)** in your web browser.
 
 ---
 
-### 6. Run 30/30 Automated E2E Security Test Suite
+### 7. Run 30/30 Automated E2E Security Test Suite
 
 Run the automated Python End-to-End test suite:
 
