@@ -2,8 +2,8 @@
  * Hasura Action Handler: approveStep
  *
  * Authentication & Authorization Boundary:
- * Extracts approver identity from Hasura request headers / session_variables or session cookie.
- * Verifies approver membership in target workflow organization BEFORE modifying step state.
+ * Strictly derives approver identity ONLY from cryptographically verified session (getAuthenticatedUser).
+ * Client-supplied x-hasura-user-id headers and body.session_variables are ignored for identity resolution.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,11 +21,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing step_run_id' }, { status: 400 });
     }
 
-    const sessionVars = body.session_variables || {};
-    const headerUserId = req.headers.get('x-hasura-user-id');
-    const session = getAuthenticatedUser(req);
-
-    const approverUserId = headerUserId || sessionVars['x-hasura-user-id'] || session?.userId;
+    // Identity is derived ONLY from cryptographically signed session token / cookie!
+    const approverUserId = getAuthenticatedUser(req)?.userId;
 
     if (!approverUserId) {
       return NextResponse.json(

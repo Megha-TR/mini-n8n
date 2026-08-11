@@ -2,8 +2,8 @@
  * Hasura Action Handler: triggerWorkflowRun
  *
  * Authentication & Authorization Boundary:
- * Extracts caller identity from Hasura request headers / session_variables or session cookie.
- * Verifies caller membership and role in target workflow organization BEFORE creating run.
+ * Strictly derives caller identity ONLY from cryptographically verified session (getAuthenticatedUser).
+ * Client-supplied x-hasura-user-id headers and body.session_variables are ignored for identity resolution.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,12 +21,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing workflow_id' }, { status: 400 });
     }
 
-    // Extract user ID: prioritize explicit Hasura session_variables / headers or authenticated session
-    const sessionVars = body.session_variables || {};
-    const headerUserId = req.headers.get('x-hasura-user-id');
-    const session = getAuthenticatedUser(req);
-
-    const callerUserId = headerUserId || sessionVars['x-hasura-user-id'] || session?.userId;
+    // Identity is derived ONLY from cryptographically signed session token / cookie!
+    const callerUserId = getAuthenticatedUser(req)?.userId;
 
     if (!callerUserId) {
       return NextResponse.json(
