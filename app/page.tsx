@@ -121,7 +121,7 @@ export default function Home() {
           // Fetch Step Runs for effective run ID
           const srData = await hasuraClient.query(
             `
-            query GetStepRuns($workflow_run_id: String!) {
+            query GetStepRuns($workflow_run_id: uuid!) {
               step_runs(where: { workflow_run_id: { _eq: $workflow_run_id } }) {
                 id
                 workflow_run_id

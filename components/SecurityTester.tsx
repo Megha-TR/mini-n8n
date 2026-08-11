@@ -224,7 +224,7 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
             'x-hasura-org-id': 'a0000000-0000-0000-0000-000000000001',
           },
           body: JSON.stringify({
-            query: `mutation AddSensitiveStep { insert_workflow_steps_one(object: { workflow_id: "c0000000-0000-0000-0000-000000000001", step_order: 99, name: "Malicious DB Write", type: "db_write", config: {} }) { id } }`,
+            query: `mutation AddSensitiveStep { insert_workflow_steps_one(object: { workflow_id: "c0000000-0000-0000-0000-000000000001", step_order: 999, name: "Unauthorized DB Write Test", type: "db_write", config: {} }) { id } }`,
           }),
         });
         const json = await res.json();

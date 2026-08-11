@@ -19,7 +19,7 @@ export async function executeHttpRequestStep(
       const res = await fetch(url, {
         method,
         headers,
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(2000),
       });
 
       const contentType = res.headers.get('content-type') || '';
