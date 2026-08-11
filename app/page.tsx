@@ -31,6 +31,22 @@ export default function Home() {
   const activeRunIdRef = useRef<string | null>(null);
   activeRunIdRef.current = activeRun?.id || null;
 
+  const loginUser = async (userId: string) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (data?.token && typeof window !== 'undefined') {
+        localStorage.setItem('minin8n_token', data.token);
+      }
+    } catch (err) {
+      console.error('Auth login failed:', err);
+    }
+  };
+
   // Reset active run state & authenticate whenever user context changes
   const handleUserSelect = async (newUserId: string) => {
     activeRunIdRef.current = null;
@@ -38,25 +54,12 @@ export default function Home() {
     setStepRuns([]);
     setSelectedWorkflow(null);
     setCurrentUserId(newUserId);
-
-    try {
-      await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: newUserId }),
-      });
-    } catch (err) {
-      console.error('Auth login failed:', err);
-    }
+    await loginUser(newUserId);
   };
 
   // Authenticate initial user on mount
   useEffect(() => {
-    fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUserId }),
-    }).catch(console.error);
+    loginUser(currentUserId);
   }, []);
 
   // Load Data for Active User/Org Context

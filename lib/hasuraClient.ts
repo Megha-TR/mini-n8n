@@ -18,10 +18,14 @@ export class HasuraGraphQLClient {
     variables: Record<string, any> = {},
     headers: Record<string, string> = {}
   ) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('minin8n_token') : null;
+    const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
     const res = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...authHeader,
         ...headers,
       },
       body: JSON.stringify({ query: queryStr, variables }),

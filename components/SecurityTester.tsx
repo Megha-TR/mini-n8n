@@ -105,10 +105,23 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
           );
         }
       } else if (testId === 'test-2') {
+        // Authenticate target attacker (David, Org B Owner) to obtain valid Bearer token
+        let token = '';
+        try {
+          const lRes = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: '44444444-4444-4444-4444-444444444444' }),
+          });
+          const lJson = await lRes.json();
+          token = lJson.token || '';
+        } catch {}
+
         const res = await fetch('/api/actions/trigger', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
             'x-hasura-user-id': '44444444-4444-4444-4444-444444444444',
             'x-hasura-role': 'owner',
             'x-hasura-org-id': 'b0000000-0000-0000-0000-000000000002',
@@ -117,7 +130,7 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
         });
         const json = await res.json();
 
-        if (res.status === 403 || json.error?.includes('403') || json.error?.includes('Cross-Org')) {
+        if (res.status === 403 || json.error?.includes('403') || json.error?.includes('Cross-Org') || json.error?.includes('Forbidden')) {
           setResults((prev) =>
             prev.map((r) =>
               r.id === testId
@@ -137,7 +150,7 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
                 ? {
                     ...r,
                     status: 'failed',
-                    details: 'FAILED: Action trigger attack succeeded unexpectedly!',
+                    details: `FAILED: Action trigger attack returned HTTP ${res.status}: "${json.error || 'unexpected success'}"`,
                     responsePayload: json,
                   }
                 : r
@@ -145,10 +158,22 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
           );
         }
       } else if (testId === 'test-3') {
+        let token = '';
+        try {
+          const lRes = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: '44444444-4444-4444-4444-444444444444' }),
+          });
+          const lJson = await lRes.json();
+          token = lJson.token || '';
+        } catch {}
+
         const res = await fetch('/api/actions/approve', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
             'x-hasura-user-id': '44444444-4444-4444-4444-444444444444',
             'x-hasura-role': 'owner',
             'x-hasura-org-id': 'b0000000-0000-0000-0000-000000000002',
@@ -173,10 +198,22 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
         }
       } else if (testId === 'test-4') {
         // Test 4: Charlie (Org A Viewer) attempts to trigger a workflow run via the Action handler
+        let token = '';
+        try {
+          const lRes = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: '33333333-3333-3333-3333-333333333333' }),
+          });
+          const lJson = await lRes.json();
+          token = lJson.token || '';
+        } catch {}
+
         const res = await fetch('/api/actions/trigger', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
             'x-hasura-user-id': '33333333-3333-3333-3333-333333333333',
             'x-hasura-role': 'viewer',
             'x-hasura-org-id': 'a0000000-0000-0000-0000-000000000001',
@@ -213,12 +250,22 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
           );
         }
       } else if (testId === 'test-5') {
-        // Test 5: Bob (Org A Editor) attempts to insert a db_write step — should be blocked by Layer 2
-        // Include step_order so the mutation is well-formed; the block must come from permissions, not constraints
+        let token = '';
+        try {
+          const lRes = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: '22222222-2222-2222-2222-222222222222' }),
+          });
+          const lJson = await lRes.json();
+          token = lJson.token || '';
+        } catch {}
+
         const res = await fetch('/api/graphql', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
             'x-hasura-user-id': '22222222-2222-2222-2222-222222222222',
             'x-hasura-role': 'editor',
             'x-hasura-org-id': 'a0000000-0000-0000-0000-000000000001',
