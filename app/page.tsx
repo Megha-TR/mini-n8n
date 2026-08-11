@@ -71,7 +71,7 @@ export default function Home() {
             name
             description
             is_active
-            recent_run {
+            runs(limit: 1, order_by: { created_at: desc }) {
               id
               workflow_id
               status
@@ -113,7 +113,9 @@ export default function Home() {
         setSteps(activeWf.steps || []);
         setTriggers(activeWf.triggers || []);
 
-        const effectiveRunId = targetRunId || (activeWf as any).recent_run?.id || (activeRunIdRef.current?.startsWith('run-') ? activeRunIdRef.current : null);
+        // Use the most recent run from the runs array relationship
+        const mostRecentRun = (activeWf as any).runs?.[0] || null;
+        const effectiveRunId = targetRunId || mostRecentRun?.id || activeRunIdRef.current || null;
 
         if (effectiveRunId) {
           // Fetch Step Runs for effective run ID
@@ -147,7 +149,7 @@ export default function Home() {
           const srList = srData?.step_runs || [];
           setStepRuns(srList);
 
-          const currentRunObj = srData?.workflow_run || (activeWf as any).recent_run || { id: effectiveRunId, status: 'running' };
+          const currentRunObj = srData?.workflow_run || mostRecentRun || { id: effectiveRunId, status: 'running' };
           setActiveRun(currentRunObj);
         } else {
           setActiveRun(null);

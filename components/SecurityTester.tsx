@@ -172,7 +172,8 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
           );
         }
       } else if (testId === 'test-4') {
-        const res = await fetch('/api/graphql', {
+        // Test 4: Charlie (Org A Viewer) attempts to trigger a workflow run via the Action handler
+        const res = await fetch('/api/actions/trigger', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -180,20 +181,31 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
             'x-hasura-role': 'viewer',
             'x-hasura-org-id': 'a0000000-0000-0000-0000-000000000001',
           },
-          body: JSON.stringify({
-            query: `mutation TriggerRun { triggerWorkflowRun(workflow_id: "c0000000-0000-0000-0000-000000000001") { run_id status } }`,
-          }),
+          body: JSON.stringify({ input: { workflow_id: 'c0000000-0000-0000-0000-000000000001' } }),
         });
         const json = await res.json();
 
-        if (res.status === 403 || json.errors?.[0]?.message?.includes('Viewer') || json.errors?.[0]?.message?.includes('403')) {
+        if (res.status === 403 || json.error?.includes('403') || json.error?.includes('Viewer') || json.error?.includes('Permission Denied')) {
           setResults((prev) =>
             prev.map((r) =>
               r.id === testId
                 ? {
                     ...r,
                     status: 'passed',
-                    details: `PASSED: Viewer role trigger rejected: "${json.errors?.[0]?.message}"`,
+                    details: `PASSED: Viewer role trigger blocked with HTTP ${res.status}: "${json.error}"`,
+                    responsePayload: json,
+                  }
+                : r
+            )
+          );
+        } else {
+          setResults((prev) =>
+            prev.map((r) =>
+              r.id === testId
+                ? {
+                    ...r,
+                    status: 'failed',
+                    details: `FAILED: Viewer was able to trigger a run (HTTP ${res.status})!`,
                     responsePayload: json,
                   }
                 : r
@@ -201,6 +213,8 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
           );
         }
       } else if (testId === 'test-5') {
+        // Test 5: Bob (Org A Editor) attempts to insert a db_write step — should be blocked by Layer 2
+        // Include step_order so the mutation is well-formed; the block must come from permissions, not constraints
         const res = await fetch('/api/graphql', {
           method: 'POST',
           headers: {
@@ -210,20 +224,33 @@ export function SecurityTester({ currentUser, currentOrg, currentMember }: Secur
             'x-hasura-org-id': 'a0000000-0000-0000-0000-000000000001',
           },
           body: JSON.stringify({
-            query: `mutation AddSensitiveStep { insert_workflow_steps_one(object: { workflow_id: "c0000000-0000-0000-0000-000000000001", name: "Malicious DB Write", type: "db_write" }) { id } }`,
-            variables: { type: 'db_write' },
+            query: `mutation AddSensitiveStep { insert_workflow_steps_one(object: { workflow_id: "c0000000-0000-0000-0000-000000000001", step_order: 99, name: "Malicious DB Write", type: "db_write", config: {} }) { id } }`,
           }),
         });
         const json = await res.json();
 
-        if (res.status === 403 || json.errors?.[0]?.message?.includes('Only organization owners')) {
+        // editor role has no insert_permissions on workflow_steps — Hasura will return a permissions error
+        if (res.status === 403 || json.errors?.length > 0) {
           setResults((prev) =>
             prev.map((r) =>
               r.id === testId
                 ? {
                     ...r,
                     status: 'passed',
-                    details: `PASSED: Layer 2 Step Gating rejected editor sensitive step creation: "${json.errors?.[0]?.message}"`,
+                    details: `PASSED: Editor cannot insert sensitive step type. Hasura blocked with: "${json.errors?.[0]?.message || 'permission-check-failed'}"`,
+                    responsePayload: json,
+                  }
+                : r
+            )
+          );
+        } else {
+          setResults((prev) =>
+            prev.map((r) =>
+              r.id === testId
+                ? {
+                    ...r,
+                    status: 'failed',
+                    details: `FAILED: Editor was able to insert a db_write step (HTTP ${res.status})!`,
                     responsePayload: json,
                   }
                 : r

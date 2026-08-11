@@ -76,10 +76,10 @@ export function ExecutionDashboard({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-[#142319] flex items-center gap-2">
-              <Play className="h-5 w-5 text-[#047857]" /> Live Execution Stream & Subscription Panel
+              <Play className="h-5 w-5 text-[#047857]" /> Live Execution Stream & Step Monitor
             </h2>
             <p className="text-xs text-[#5c6b60] mt-0.5">
-              Streaming real-time step state progression via Hasura GraphQL Subscriptions.
+              Live step state updates via 1-second polling against Hasura GraphQL Engine.
             </p>
           </div>
 
