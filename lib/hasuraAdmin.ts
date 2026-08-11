@@ -9,9 +9,16 @@
  * browser-side code to talk to our /api/graphql proxy.
  */
 
-const HASURA_ENDPOINT = process.env.HASURA_GRAPHQL_URL
-  || process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL
-  || 'http://localhost:8080/v1/graphql';
+export function getHasuraEndpoint(): string {
+  const raw = process.env.HASURA_GRAPHQL_URL
+    || process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL
+    || 'http://localhost:8080/v1/graphql';
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return `http://${trimmed}`;
+  }
+  return trimmed;
+}
 
 const HASURA_ADMIN_SECRET = process.env.HASURA_GRAPHQL_ADMIN_SECRET || 'myadminsecretkey';
 
@@ -20,6 +27,7 @@ export async function hasuraAdminQuery<T = any>(
   variables: Record<string, any> = {},
   sessionHeaders?: Record<string, string>
 ): Promise<T> {
+  const HASURA_ENDPOINT = getHasuraEndpoint();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-hasura-admin-secret': HASURA_ADMIN_SECRET,
@@ -61,6 +69,7 @@ export async function isHasuraAvailable(): Promise<boolean> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1500);
 
+    const HASURA_ENDPOINT = getHasuraEndpoint();
     const res = await fetch(HASURA_ENDPOINT, {
       method: 'POST',
       headers: {

@@ -18,6 +18,8 @@ services:
         generateValue: true
       - key: HASURA_GRAPHQL_UNAUTHORIZED_ROLE
         value: anonymous
+      - key: PORT
+        value: "8080"
 
   # 2. Next.js Web Application Service
   - type: web
@@ -31,14 +33,14 @@ services:
         fromService:
           type: web
           name: mini-n8n-hasura
-          property: url
-          append: /v1/graphql
+          property: hostport
+        append: /v1/graphql
       - key: NEXT_PUBLIC_HASURA_GRAPHQL_URL
         fromService:
           type: web
           name: mini-n8n-hasura
-          property: url
-          append: /v1/graphql
+          property: hostport
+        append: /v1/graphql
       - key: HASURA_GRAPHQL_ADMIN_SECRET
         fromService:
           type: web
@@ -54,5 +56,5 @@ services:
 databases:
   # 3. PostgreSQL Database
   - name: mini-n8n-postgres
-    databaseName: postgres
-    user: postgres
+    databaseName: minin8ndb
+    user: minin8nuser

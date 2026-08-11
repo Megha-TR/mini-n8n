@@ -11,10 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/authSession';
-
-const HASURA_ENDPOINT = process.env.HASURA_GRAPHQL_URL
-  || process.env.NEXT_PUBLIC_HASURA_GRAPHQL_URL
-  || 'http://localhost:8080/v1/graphql';
+import { getHasuraEndpoint } from '@/lib/hasuraAdmin';
 
 const HASURA_ADMIN_SECRET = process.env.HASURA_GRAPHQL_ADMIN_SECRET || 'myadminsecretkey';
 
@@ -52,6 +49,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const requestedOrgId = req.headers.get('x-hasura-org-id') || req.headers.get('x-org-id');
+  const HASURA_ENDPOINT = getHasuraEndpoint();
 
   // 2. Query PostgreSQL via Hasura Admin Secret to resolve user's org membership & real role
   let authRes: Response;
