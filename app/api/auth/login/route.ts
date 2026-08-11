@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createNhostSession, SESSION_COOKIE_NAME } from '@/lib/authSession';
 import { hasuraAdminQuery } from '@/lib/hasuraAdmin';
+import { DEMO_MEMBERS, DEMO_ORGS } from '@/lib/demoUsers';
 
 const USER_QUERY = `
   query GetUser($id: uuid!) {
@@ -38,8 +39,25 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify user exists in PostgreSQL via org_members table lookup
-    const res = await hasuraAdminQuery<any>(USER_QUERY, { id: userId });
-    const members = res.org_members || [];
+    let members: any[] = [];
+    try {
+      const res = await hasuraAdminQuery<any>(USER_QUERY, { id: userId });
+      members = res.org_members || [];
+    } catch (e: any) {
+      console.warn('Hasura query unavailable during login, using DEMO_MEMBERS fallback:', e.message);
+      const demoMember = DEMO_MEMBERS.find((m) => m.user_id === userId);
+      if (demoMember) {
+        const demoOrg = DEMO_ORGS.find((o) => o.id === demoMember.org_id);
+        members = [
+          {
+            user_id: demoMember.user_id,
+            role: demoMember.role,
+            org_id: demoMember.org_id,
+            organization: demoOrg ? { id: demoOrg.id, name: demoOrg.name } : null,
+          },
+        ];
+      }
+    }
 
     if (members.length === 0) {
       return NextResponse.json(

@@ -1,0 +1,58 @@
+# Render Infrastructure Blueprint for Mini-n8n Stack
+# Deploys PostgreSQL + Hasura GraphQL Engine + Next.js App Service
+
+services:
+  # 1. Hasura GraphQL Engine Service
+  - type: web
+    name: mini-n8n-hasura
+    env: docker
+    dockerfilePath: Dockerfile.hasura
+    envVars:
+      - key: HASURA_GRAPHQL_DATABASE_URL
+        fromDatabase:
+          name: mini-n8n-postgres
+          property: connectionString
+      - key: HASURA_GRAPHQL_ENABLE_CONSOLE
+        value: "true"
+      - key: HASURA_GRAPHQL_ADMIN_SECRET
+        generateValue: true
+      - key: HASURA_GRAPHQL_UNAUTHORIZED_ROLE
+        value: anonymous
+
+  # 2. Next.js Web Application Service
+  - type: web
+    name: mini-n8n-app
+    env: docker
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HASURA_GRAPHQL_URL
+        fromService:
+          type: web
+          name: mini-n8n-hasura
+          property: url
+          append: /v1/graphql
+      - key: NEXT_PUBLIC_HASURA_GRAPHQL_URL
+        fromService:
+          type: web
+          name: mini-n8n-hasura
+          property: url
+          append: /v1/graphql
+      - key: HASURA_GRAPHQL_ADMIN_SECRET
+        fromService:
+          type: web
+          name: mini-n8n-hasura
+          envVarKey: HASURA_GRAPHQL_ADMIN_SECRET
+      - key: NEXT_PUBLIC_NHOST_SUBDOMAIN
+        value: local
+      - key: NEXT_PUBLIC_NHOST_REGION
+        value: local
+      - key: GEMINI_API_KEY
+        sync: false
+
+databases:
+  # 3. PostgreSQL Database
+  - name: mini-n8n-postgres
+    databaseName: postgres
+    user: postgres
