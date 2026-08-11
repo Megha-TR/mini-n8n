@@ -223,13 +223,12 @@ export default function Home() {
   // Handler: Run Workflow
   const handleRunWorkflow = async () => {
     if (!selectedWorkflow) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('minin8n_token') : null;
     const res = await fetch('/api/actions/trigger', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-hasura-user-id': currentUser.id,
-        'x-hasura-role': currentMember.role,
-        'x-hasura-org-id': currentOrg.id,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ input: { workflow_id: selectedWorkflow.id } }),
     });
@@ -249,13 +248,12 @@ export default function Home() {
 
   // Handler: Approve Step
   const handleApproveStep = async (stepRunId: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('minin8n_token') : null;
     const res = await fetch('/api/actions/approve', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-hasura-user-id': currentUser.id,
-        'x-hasura-role': currentMember.role,
-        'x-hasura-org-id': currentOrg.id,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ input: { step_run_id: stepRunId } }),
     });
