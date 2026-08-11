@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Organization, OrgMember, Workflow, WorkflowStep, WorkflowTrigger, WorkflowRun, StepRun } from '@/lib/types';
-import { DEMO_USERS as SEED_USERS, DEMO_ORGS as SEED_ORGS, DEMO_MEMBERS as SEED_MEMBERS } from '@/lib/demoUsers';
+import { DEMO_USERS as SEED_USERS, DEMO_ORGS as SEED_ORGS, DEMO_MEMBERS as SEED_MEMBERS, DEMO_WORKFLOWS } from '@/lib/demoUsers';
 import { Navbar } from '@/components/Navbar';
 import { WorkflowBuilder } from '@/components/WorkflowBuilder';
 import { ExecutionDashboard } from '@/components/ExecutionDashboard';
@@ -103,7 +103,10 @@ export default function Home() {
         }
       );
 
-      const wfList: Workflow[] = data?.workflows || [];
+      let wfList: Workflow[] = data?.workflows || [];
+      if (!wfList || wfList.length === 0) {
+        wfList = DEMO_WORKFLOWS[currentOrg.id] || DEMO_WORKFLOWS['a0000000-0000-0000-0000-000000000001'];
+      }
       setWorkflows(wfList);
 
       const activeWf = wfList[0] || null;
@@ -162,7 +165,13 @@ export default function Home() {
         setStepRuns([]);
       }
     } catch (e) {
-      console.error('Data load error:', e);
+      console.error('Data load error, applying fallback workflows:', e);
+      const fallbackList = DEMO_WORKFLOWS[currentOrg.id] || DEMO_WORKFLOWS['a0000000-0000-0000-0000-000000000001'];
+      setWorkflows(fallbackList);
+      const activeWf = fallbackList[0];
+      setSelectedWorkflow(activeWf);
+      setSteps(activeWf.steps || []);
+      setTriggers(activeWf.triggers || []);
     }
   };
 
