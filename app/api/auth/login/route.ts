@@ -1,13 +1,13 @@
 /**
- * Auth Login API Endpoint: /api/auth/login
+ * Nhost Auth Login API Endpoint: /api/auth/login
  *
- * Authenticates user credentials/identity against PostgreSQL (auth.users table).
- * On successful authentication, creates a cryptographically signed session token
+ * Authenticates user credentials/identity against PostgreSQL.
+ * On successful authentication, creates an Nhost Auth JWT session containing Hasura claims
  * and sets an HTTP-Only cookie 'minin8n_session'.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createSessionToken, SESSION_COOKIE_NAME } from '@/lib/authSession';
+import { createNhostSession, SESSION_COOKIE_NAME } from '@/lib/authSession';
 import { hasuraAdminQuery } from '@/lib/hasuraAdmin';
 
 const USER_QUERY = `
@@ -48,18 +48,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create cryptographically signed session token
-    const token = createSessionToken(userId, email);
+    const role = members[0].role;
+    const orgId = members[0].org_id;
+    const orgName = members[0].organization?.name;
+
+    // Create standard Nhost Auth session
+    const nhostSession = createNhostSession(userId, email, role, orgId, orgName);
+    const token = nhostSession.accessToken;
 
     const response = NextResponse.json({
       success: true,
-      message: 'Authentication successful',
+      message: 'Nhost Auth authentication successful',
       token,
+      session: nhostSession,
       user: {
         id: userId,
         email,
-        org_id: members[0].org_id,
-        role: members[0].role,
+        org_id: orgId,
+        role: role,
         organization: members[0].organization,
       },
     });
